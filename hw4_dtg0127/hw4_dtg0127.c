@@ -50,7 +50,7 @@ static inline void cs_deselect(uint cs_pin) {
 void writeDAC(){
     uint8_t data[2];
     int len = 2;
-    data[0] = 0b01111000;
+    data[0] = 0b01110011;
     data[1] = 0b00000000;
     cs_select(CS_PIN_NUM);
     spi_write_blocking(SPI_PORT, data, len); // where data is a uint8_t array with length len
