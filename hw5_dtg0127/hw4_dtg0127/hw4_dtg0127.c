@@ -15,7 +15,7 @@
 #define SDO_PIN_RAM 16
 
 #define PI 3.142
-#define FREQ 2
+#define FREQ 1
 
 void spi_initialize(void);
 static inline void cs_select(uint cs_pin);
@@ -23,36 +23,69 @@ static inline void cs_deselect(uint cs_pin);
 void writeDAC(int channel, float volts);
 void spi_ram_init(void);
 void spi_ram_write(uint16_t addr, float v);
+float spi_ram_read(uint16_t addr);
 
 int main()
 {
     stdio_init_all();
 
-    while (!stdio_usb_connected()) { // wait until the USB port has been opened
-        sleep_ms(100);
-    }
-    printf("Start!\n\r\n");
+    // while (!stdio_usb_connected()) { // wait until the USB port has been opened
+    //     sleep_ms(100);
+    // }
+    // printf("Start!\n\r\n");
 
     spi_initialize();
     spi_ram_init();
 
     float t=0;
 
-    float v = 1.23;
+    // float v_new,v = 1.23;
 
-    spi_ram_write(0x1234, v);
+
+    // spi_ram_write(0x4, v);
+
+    // v_new = spi_ram_read(0x4);
+
+    // printf("%.2f\r\n", v_new);
+
+    uint16_t address = 0;
+
+
+    // load 1000 floats into external RAM  representing a single cycle of a sine wave from 0V to 3.3V.
+
+    for (int i=0;i<1000;i++){
+        float voltage = 1.65*sin(FREQ*t*2.0*PI) + 1.65;
+        // float v = fabs(3.3*(fmod(2*FREQ*t,2)-1));
+        t=t+0.002;
+        spi_ram_write(address, voltage);
+        address += 4;
+    }
+
+    // check the first 20 values
+
+    address = 0;
+    float v_check;
+
+    // for (int i=0;i<20;i++){
+    //     // float v = fabs(3.3*(fmod(2*FREQ*t,2)-1));
+    //     v_check = spi_ram_read(address);
+    //     address += 4;
+    //     printf("%.2f\r\n", v_check);
+    //     sleep_ms(250);
+    // }
+
 
     while (1){
 
-        // for (int i=0;i<200;i++){
-        //     float v = 1.65*sin(FREQ*t*2.0*PI) + 1.65;
-        //     // float v = fabs(3.3*(fmod(2*FREQ*t,2)-1));
-        //     t=t+0.002;
-        //     writeDAC(0,v);
-        //     sleep_ms(2);
-        // }
-        // printf("Data written!\r\n");
-        //sleep_ms(0.01);
+        for (int i=0;i<1000;i++){
+            v_check = spi_ram_read(address);
+            writeDAC(0,v_check);
+            address += 4;
+            sleep_ms(2);
+        }
+        printf("Data written!\r\n");
+        address = 0;
+        sleep_ms(0.01);
     }
 }
 
@@ -67,6 +100,7 @@ void spi_initialize(void){
 
     gpio_set_function(SCK_PIN_RAM, GPIO_FUNC_SPI); // set the SCK to GP18 (pin 24)
     gpio_set_function(SDI_PIN_RAM, GPIO_FUNC_SPI); // set the SDI to GP19 (pin 25) 
+    gpio_set_function(SDO_PIN_RAM, GPIO_FUNC_SPI); // set the SD16 to GP19 (pin 25) 
 
     gpio_init(CS_PIN_RAM); // set CS to GP17 (pin 22)
     gpio_set_dir(CS_PIN_RAM, GPIO_OUT); // set GP17 to be output pin for chip select
@@ -155,7 +189,7 @@ void spi_ram_write(uint16_t addr, float v){
     buf[0] = 0b10; // sequential write instruction
 
     buf[1] = addr >> 8; // bit 15-8 of address
-    buf[2] = addr; // bit 7-0 of address
+    buf[2] = addr & 0xFF; // bit 7-0 of address
 
     buf[3] = num.i >> 24;
     buf[4] = num.i >> 16;
@@ -166,4 +200,40 @@ void spi_ram_write(uint16_t addr, float v){
     spi_write_blocking(SPI_PORT, buf, 7);
     cs_deselect(CS_PIN_RAM);
 
+}
+
+float spi_ram_read(uint16_t addr){
+    uint8_t write[7], read[7];
+
+    write[0] = 0b11; // instruction for sequential read sequence
+    write[1] = addr >> 8; // bit 15-8 of address
+    write[2] = addr & 0xFF; // bit 7-0 of address
+
+    write[3] = 0b1; // send garbage
+    write[4] = 0b1;
+    write[5] = 0b1;
+    write[6] = 0b1;
+
+    cs_select(CS_PIN_RAM);
+    spi_write_read_blocking(SPI_PORT, write, read, 7);
+    // spi_write_blocking(SPI_PORT, write, 3);
+    // spi_read_blocking(SPI_PORT, 0, read, 4);
+    cs_deselect(CS_PIN_RAM);
+
+    union FloatInt {
+        float f;
+        uint32_t i;
+    };
+
+    union FloatInt num;
+    
+    uint32_t raw = 0;
+    raw = raw | (uint32_t)read[3]<<24;
+    raw = raw | (uint32_t)read[4]<<16;
+    raw = raw | (uint32_t)read[5]<<8;
+    raw = raw | (uint32_t)read[6];
+
+    num.i = raw;
+
+    return num.f;
 }
