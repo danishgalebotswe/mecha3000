@@ -3,6 +3,7 @@
 #include "hardware/i2c.h"
 #include "ssd1306.h"
 #include "font.h"
+#include "hardware/adc.h"
 
 // I2C defines
 // This example will use I2C0 on GPIO8 (SDA) and GPIO9 (SCL) running at 400KHz.
@@ -12,6 +13,8 @@
 #define I2C_SCL 9
 #define LED_PIN 25
 
+void adc_initialize(void);
+float readVolts(void);
 void drawMessage(int x, int y, char *m);
 void drawLetter(int x, int y, char c);
 
@@ -19,10 +22,7 @@ void drawLetter(int x, int y, char c);
 int main()
 {
     stdio_init_all();
-
-    ssd1306_setup();
-    ssd1306_clear();
-    ssd1306_update();
+    adc_initialize();
 
 
     // I2C Initialisation. Using it at 400Khz.
@@ -34,20 +34,50 @@ int main()
     // gpio_pull_up(I2C_SCL);
     // For more examples of I2C use see https://github.com/raspberrypi/pico-examples/tree/master/i2c
 
+    ssd1306_setup();
+    ssd1306_clear();
+    ssd1306_update();
+
 
     gpio_init(LED_PIN);
-    gpio_set_dir(LED_PIN,0);
+    gpio_set_dir(LED_PIN,true);
     
     while (true) {
         gpio_put(LED_PIN,1);
+
+        float voltage = readVolts();
+
         char message[50];
-        sprintf(message,"hello");
+        sprintf(message,"Voltage Reading: %.2f",voltage);
+        // printf("%.2f\r\n", voltage);
+        unsigned int start = to_us_since_boot(get_absolute_time());
         drawMessage(3,12,message);
+        ssd1306_update();
+        unsigned int end = to_us_since_boot(get_absolute_time());
+
+        float time = (float)(1.0/((end-start)*1e-6));
+
+        sprintf(message,"FPS: %.2f ",time);
+        drawMessage(3,21,message);
         ssd1306_update();
         // printf("Hello, world!\n");
         sleep_ms(1000);
         gpio_put(LED_PIN,0);
+        sleep_ms(1000);
     }
+}
+
+void adc_initialize(void){
+    adc_init(); // init the adc module
+    adc_gpio_init(26); // set ADC0 pin to be adc input instead of GPIO
+    adc_select_input(0); // select to read from ADC0
+}
+
+float readVolts(void){
+    uint16_t result = adc_read();
+    float volts = 3.3 / 4095 * result;
+
+    return volts;
 }
 
 void drawMessage(int x, int y, char *m){
