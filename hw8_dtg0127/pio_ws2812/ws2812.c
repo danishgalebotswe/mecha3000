@@ -162,7 +162,7 @@ int main() {
 
             for (int i = 0; i < NUM_PIXELS; i++) {
                 float pixel_hue = wrapHue(base_hue + (i * (360.0f / NUM_PIXELS))); // offset for each pixel
-                wsColor c = HSBtoRGB(pixel_hue, 1.0f, 0.05f); // full saturation, 50% brightness
+                wsColor c = HSBtoRGB(pixel_hue, 1.0f, 1.0f); // full saturation, 50% brightness
                 put_pixel(pio, sm, urgb_u32(c.r, c.g, c.b));
                 
                 if (pixel_hue<=180){
