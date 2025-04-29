@@ -13,22 +13,42 @@
 #define LEDPin 15
 #define ADCPin 26
 
+volatile int talking = 0;
+volatile int num;
+volatile float voltage;
+
 void setup_LED(void);
 void adc_initialize(void);
 
 void core1_entry() {
 
-    multicore_fifo_push_blocking(FLAG_VALUE);
+    // multicore_fifo_push_blocking(FLAG_VALUE);
 
-    uint32_t g = multicore_fifo_pop_blocking();
+    // uint32_t g = multicore_fifo_pop_blocking();
 
-    if (g != FLAG_VALUE)
-        printf("Hmm, that's not right on core 1!\n");
-    else
-        printf("Its all gone well on core 1!\r\n");
+    // if (g != FLAG_VALUE)
+    //     printf("Hmm, that's not right on core 1!\n");
+    // else
+    //     printf("Its all gone well on core 1!\r\n");
 
-    while (1)
-        tight_loop_contents();
+    while (1){
+        if (talking==1){
+            uint32_t g = multicore_fifo_pop_blocking(); // read the user input
+            if (g==0){
+                uint16_t result = adc_read();
+                voltage = 3.3 / 4095 * result;
+                multicore_fifo_push_blocking(FLAG_VALUE);    
+            }
+
+            else if (g==1){
+                gpio_put(LEDPin,true);
+            }
+
+            else if (g==2){
+                gpio_put(LEDPin,false);
+            }
+        }
+    }
 }
 
 int main() {
@@ -49,26 +69,33 @@ int main() {
 
     // Wait for it to start up
 
-    uint32_t g = multicore_fifo_pop_blocking();
+    // uint32_t g = multicore_fifo_pop_blocking();
 
-    if (g != FLAG_VALUE)
-        printf("Hmm, that's not right on core 0!\n");
-    else {
-        multicore_fifo_push_blocking(FLAG_VALUE);
-        printf("It's all gone well on core 0!\r\n");
-    }
+    // if (g != FLAG_VALUE)
+    //     printf("Hmm, that's not right on core 0!\n");
+    // else {
+    //     multicore_fifo_push_blocking(FLAG_VALUE);
+    //     printf("It's all gone well on core 0!\r\n");
+    // }
 
     /// \end::setup_multicore[]
 
     while (1){
         //tight_loop_contents();
-        int num;
         printf("\n\nWhat would you like to do:\n\t0: Read voltage\n\t1: Turn on LED\n\t2: Turn off LED\n");
         scanf("%i",&num);
-        printf("You have entered %i", num);
-        // uint16_t result = adc_read();
-        // float volts = 3.3 / 4095 * result;
-        // printf("%.2f\r\n",volts);
+        printf("You have entered %i\n\n", num);
+
+        talking = 1; // getting ready to send user input
+        multicore_fifo_push_blocking(num); // sending the user input to Core 1
+
+        if (num==0){
+            uint32_t h = multicore_fifo_pop_blocking(); // read the voltage from Core 0
+            if (h==FLAG_VALUE){
+                printf("The voltage is %.2f V\r\n", voltage); 
+                talking = 0;
+            }
+        }
     }
 }
 
