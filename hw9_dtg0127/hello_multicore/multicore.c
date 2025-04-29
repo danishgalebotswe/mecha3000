@@ -63,7 +63,7 @@ int main() {
     while (1){
         //tight_loop_contents();
         int num;
-        printf("\n\nWhat would you like to do:\n\t0: Read voltage\n\t1:Turn on LED\n\t2: Turn off LED\n");
+        printf("\n\nWhat would you like to do:\n\t0: Read voltage\n\t1: Turn on LED\n\t2: Turn off LED\n");
         scanf("%i\n",&num);
         printf("You have entered %i", num);
         // uint16_t result = adc_read();
