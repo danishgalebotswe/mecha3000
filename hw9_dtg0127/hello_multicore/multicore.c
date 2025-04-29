@@ -7,12 +7,14 @@
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "pico/multicore.h"
+#include "hardware/adc.h"
 
 #define FLAG_VALUE 123
 #define LEDPin 15
-#define ADCPin 31
+#define ADCPin 26
 
 void setup_LED(void);
+void adc_initialize(void);
 
 void core1_entry() {
 
@@ -33,6 +35,7 @@ int main() {
 
     stdio_init_all();
     setup_LED();
+    adc_initialize();
 
     while (!stdio_usb_connected()) {
         sleep_ms(100);
@@ -58,7 +61,14 @@ int main() {
     /// \end::setup_multicore[]
 
     while (1){
-        tight_loop_contents();
+        //tight_loop_contents();
+        int num;
+        printf("What would you like to do:\n\t0: Read voltage\n\t1:Turn on LED\n\t2: Turn off LED\n");
+        scanf("%i\n",&num);
+        printf("You have entered %i", num);
+        // uint16_t result = adc_read();
+        // float volts = 3.3 / 4095 * result;
+        // printf("%.2f\r\n",volts);
     }
 }
 
@@ -69,4 +79,10 @@ void setup_LED(void){
     gpio_put(LEDPin,true);
     sleep_ms(500);
     gpio_put(LEDPin,false);
+}
+
+void adc_initialize(void){
+    adc_init(); // init the adc module
+    adc_gpio_init(ADCPin); // set ADC0 pin to be adc input instead of GPIO
+    adc_select_input(0); // select to read from ADC0
 }
