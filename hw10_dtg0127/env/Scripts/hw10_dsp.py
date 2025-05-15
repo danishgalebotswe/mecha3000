@@ -17,8 +17,17 @@ with open('sigA.csv') as f:
 #     # print the data to verify it was read
 #     print(str(t[i]) +", " + str(data1[i]))
 
+# Calculating the sample rate
+sample_rate = len(data1)/ t[-1]
+print('Sample rate = ' + str(sample_rate) + 'Hz.')
+
 plt.plot(t,data1)
 plt.xlabel('Time (sec)')
 plt.ylabel('Signal')
 plt.title('Signal vs Time')
 plt.show()
+
+
+
+
+
