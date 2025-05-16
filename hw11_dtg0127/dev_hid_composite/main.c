@@ -27,10 +27,28 @@
 #include <stdio.h>
 #include <string.h>
 
+
+#include "pico/stdlib.h"
+
 #include "bsp/board_api.h"
 #include "tusb.h"
 
+#include <math.h>
+
 #include "usb_descriptors.h"
+
+#define LEFT_BUTTON 14
+#define RIGHT_BUTTON 21
+#define UP_BUTTON 19
+#define DOWN_BUTTON 20
+
+#define CIRCLE_BUTTON 11
+
+#define LED_PIN 15
+
+#define PI 3.142
+
+
 
 //--------------------------------------------------------------------+
 // MACRO CONSTANT TYPEDEF PROTYPES
@@ -49,13 +67,17 @@ enum  {
 
 static uint32_t blink_interval_ms = BLINK_NOT_MOUNTED;
 
+static float angle = 0;
+
 void led_blinking_task(void);
 void hid_task(void);
+void buttons_init(void);
 
 /*------------- MAIN -------------*/
 int main(void)
 {
   board_init();
+  buttons_init();
 
   // init device stack on configured roothub port
   tud_init(BOARD_TUD_RHPORT);
@@ -78,6 +100,25 @@ int main(void)
 //--------------------------------------------------------------------+
 
 // Invoked when device is mounted
+void buttons_init(void) 
+{
+  gpio_init(LEFT_BUTTON);
+  gpio_init(RIGHT_BUTTON);
+  gpio_init(UP_BUTTON);
+  gpio_init(DOWN_BUTTON);
+  gpio_init(CIRCLE_BUTTON);
+
+  gpio_init(LED_PIN);
+
+  gpio_set_dir(LEFT_BUTTON, GPIO_IN); // set the button pin to input
+  gpio_set_dir(RIGHT_BUTTON, GPIO_IN); // set the button pin to input
+  gpio_set_dir(UP_BUTTON, GPIO_IN); // set the button pin to input
+  gpio_set_dir(DOWN_BUTTON, GPIO_IN); // set the button pin to input
+  gpio_set_dir(CIRCLE_BUTTON, GPIO_IN); // set the button pin to input
+
+  gpio_set_dir(LED_PIN, GPIO_OUT); // set the LED pin to output
+
+}
 void tud_mount_cb(void)
 {
   blink_interval_ms = BLINK_MOUNTED;
@@ -138,10 +179,55 @@ static void send_hid_report(uint8_t report_id, uint32_t btn)
 
     case REPORT_ID_MOUSE:
     {
-      int8_t const delta = 5;
+      int8_t const slow_delta = 5;
+
+      int8_t xdelta = 0;
+      int8_t ydelta = 0;
+
+      
+      float angle_step = 2*PI/100;
+      
+      static bool toggle_mode = true;
+      gpio_put(LED_PIN,false);
+
+      if (!gpio_get(CIRCLE_BUTTON)){
+        toggle_mode = !toggle_mode;
+      }
+
+      if (toggle_mode == true){
+        if (!gpio_get(UP_BUTTON)){
+            ydelta = -slow_delta;
+        }
+
+        if (!gpio_get(DOWN_BUTTON)){
+            ydelta = slow_delta;
+        }
+
+        if (!gpio_get(LEFT_BUTTON)){
+            xdelta = -slow_delta;
+        }
+
+        if (!gpio_get(RIGHT_BUTTON)){
+            xdelta = slow_delta;
+        }
+
+        tud_hid_mouse_report(REPORT_ID_MOUSE, 0x00, xdelta, ydelta, 0, 0);
+      }
+
+      while (toggle_mode == false){
+          gpio_put(LED_PIN,true);
+          xdelta = (int8_t)(slow_delta * cos(angle));
+          ydelta = (int8_t)(slow_delta * sin(angle));
+
+          angle += angle_step;
+
+          tud_hid_mouse_report(REPORT_ID_MOUSE, 0x00, xdelta, ydelta, 0, 0);
+ 
+          toggle_mode = true; 
+      }
 
       // no button, right + down, no scroll, no pan
-      tud_hid_mouse_report(REPORT_ID_MOUSE, 0x00, delta, delta, 0, 0);
+      // tud_hid_mouse_report(REPORT_ID_MOUSE, 0x00, xdelta, ydelta, 0, 0);
     }
     break;
 
@@ -220,7 +306,7 @@ void hid_task(void)
   }else
   {
     // Send the 1st of report chain, the rest will be sent by tud_hid_report_complete_cb()
-    send_hid_report(REPORT_ID_KEYBOARD, btn);
+    send_hid_report(REPORT_ID_MOUSE, btn);
   }
 }
 
