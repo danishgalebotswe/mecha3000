@@ -10,8 +10,9 @@
 #define I2C_PORT i2c0
 #define I2C_SDA 8
 #define I2C_SCL 9
-#define OLED_I2C_SDA 12
-#define OLED_I2C_SCL 13
+#define OLED_I2C_PORT i2c1
+#define OLED_I2C_SDA 14
+#define OLED_I2C_SCL 15
 
 // config registers
 #define CONFIG 0x1A
@@ -40,7 +41,7 @@
 #define LED_PIN      25
 
 void imu_init(void);
-uint8_t imu_read(uint8_t reg);
+uint8_t imu_read(uint8_t msg);
 void oled_init(void);
 void drawMessage(int x, int y, char *m);
 void drawLetter(int x, int y, char c);
@@ -49,9 +50,9 @@ int main()
 {
     stdio_init_all();
 
-    while (!stdio_usb_connected()) {
-        sleep_ms(100);
-    }
+    // while (!stdio_usb_connected()) {
+    //     sleep_ms(100);
+    // }
     printf("Initializing IMU!\n");
 
     imu_init();
@@ -60,6 +61,7 @@ int main()
     ssd1306_setup();
     ssd1306_clear();
     ssd1306_update();
+    
 
     // For more examples of I2C use see https://github.com/raspberrypi/pico-examples/tree/master/i2c
 
@@ -72,20 +74,25 @@ int main()
         uint8_t yl = imu_read(ACCEL_YOUT_L);
 
         // combine to 16 bit numbers
-        uint16_t x_raw = (uint16_t)((xh<<8) | xl);
-        uint16_t y_raw = (uint16_t)((yh<<8) | yl);
+        int16_t x_raw = (int16_t)((xh<<8) | xl);
+        int16_t y_raw = (int16_t)((yh<<8) | yl);
 
         // convert to acceleration in g's
-        float x_g = x_raw * 16384.0f;
+        float x_g = x_raw / 16384.0f;
         float y_g = y_raw / 16384.0f;
 
-        // printf("X-ACCEL = %.3f, Y-ACCEL = %.3f\n", x_g, y_g);
+        printf("X-ACCEL = %.3f, Y-ACCEL = %.3f\n", x_g, y_g);
+
         char message[50];
-        sprintf(message,"X-ACCEL = %.3f, Y-ACCEL = %.3f\n", x_g, y_g);
+        sprintf(message,"X-ACCEL = %.3f\n", x_g);
         drawMessage(3,12,message);
         ssd1306_update();
 
-        sleep_ms(500);
+        sprintf(message,"Y-ACCEL = %.3f\n", y_g);
+        drawMessage(3,21,message);
+        ssd1306_update();
+
+        sleep_ms(1000);
     }
 }
 
@@ -105,33 +112,36 @@ void imu_init(void){
     gpio_put(LED_PIN, 0); 
 
     // turn on the chip
-    uint8_t buf[1];
-    buf[0] = 0x00;
-    i2c_write_blocking(I2C_PORT, PWR_MGMT_1, buf, 1, false);
+    uint8_t buf[2];
+    buf[0] = PWR_MGMT_1;
+    buf[1] = 0x00;
+    i2c_write_blocking(I2C_PORT, IMU_ADDR, buf, 2, false);
 
     // enable the accelerometer
-    i2c_write_blocking(I2C_PORT, ACCEL_CONFIG, buf,1,false);
+    buf[1] = ACCEL_CONFIG;
+    i2c_write_blocking(I2C_PORT, IMU_ADDR, buf, 2,false);
 
     // check the i2c
+    uint8_t whoami = imu_read(WHO_AM_I);
+    printf("0x%02x\r\n",whoami);
 
-    uint8_t reg[1];
-    reg[0] = 0x68;
-    
-    buf[0] = imu_read(WHO_AM_I);
 
-    printf("0x%02x\r\n",buf);
     gpio_put(LED_PIN, 1);
     printf("IMU initialized!\n");
 }
 
-uint8_t imu_read(uint8_t reg) {
-    i2c_write_blocking(I2C_PORT,IMU_ADDR, &reg, 1, true); // send the reg address
+uint8_t imu_read(uint8_t msg) {
+    uint8_t reg[2];
+    reg[0] = msg;
+    reg[1] = 0x00;
     uint8_t val;
+    i2c_write_blocking(I2C_PORT,IMU_ADDR, reg, 1, true); // send the reg address
     i2c_read_blocking(I2C_PORT, IMU_ADDR, &val, 1, false); // read the result
     return val;
 }
 
 void oled_init(void) {
+    i2c_init(OLED_I2C_PORT, 400*1000);
     gpio_set_function(OLED_I2C_SDA, GPIO_FUNC_I2C);
     gpio_set_function(OLED_I2C_SCL, GPIO_FUNC_I2C);
 }

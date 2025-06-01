@@ -8,6 +8,8 @@
 unsigned char SSD1306_ADDRESS = 0b0111100; // 7bit i2c address
 unsigned char ssd1306_buffer[513]; // 128x32/8. Every bit is a pixel except first byte
 
+#define OLED_I2C_PORT i2c1
+
 void ssd1306_setup() {
     // first byte in ssd1306_buffer is a command
     ssd1306_buffer[0] = 0x40;
@@ -54,7 +56,7 @@ void ssd1306_command(unsigned char c) {
     uint8_t buf[2];
     buf[0] = 0x00;
     buf[1] =c;
-    i2c_write_blocking(i2c_default, SSD1306_ADDRESS, buf, 2, false);
+    i2c_write_blocking(OLED_I2C_PORT, SSD1306_ADDRESS, buf, 2, false);
 }
 
 // update every pixel on the screen
@@ -79,7 +81,7 @@ void ssd1306_update() {
     i2c_master_stop();
     */
 
-    i2c_write_blocking(i2c_default, SSD1306_ADDRESS, ptr, 513, false);
+    i2c_write_blocking(OLED_I2C_PORT, SSD1306_ADDRESS, ptr, 513, false);
 }
 
 // set a pixel value. Call update() to push to the display)
