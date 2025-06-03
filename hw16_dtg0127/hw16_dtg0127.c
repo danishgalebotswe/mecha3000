@@ -10,7 +10,7 @@ void pwm_pin_setup(void);
 void setMotor(int dutyCycle);
 
 uint16_t wrap = 60000;
-int duty = 50;
+int duty = 0;
 uint slice_num;
 
 int main()
